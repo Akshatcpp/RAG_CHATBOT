@@ -1,0 +1,16 @@
+Flask
+faiss-cpu
+nltk
+openai
+langchain
+langchain-community
+unstructured
+tqdm
+lxml
+python-magic
+html5lib
+markdown
+joblib
+regex
+requests
+
