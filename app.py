@@ -14,116 +14,152 @@ from langchain.chains import create_retrieval_chain
 from langchain_core.documents import Document
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this'
 
-# --- CONFIGURATION ---
-VECTOR_STORE_PATH = "vectorstore_gemini"
-NOTES_PATH = "notes"
-LLM_MODEL = "gemini-1.5-flash-latest"
+# --- CONFIGURATION FROM ENVIRONMENT VARIABLES ---
+# CRITICAL: Flask Secret Key for session management. MUST be set in production!
+app.secret_key = os.getenv('FLASK_SECRET_KEY')
+if not app.secret_key:
+    # In development, you might use a default, but for production, this should always be set.
+    # For local development, you could set this in a .env file (see python-dotenv).
+    print("WARNING: FLASK_SECRET_KEY environment variable not set. Using a default for development.")
+    app.secret_key = 'your-very-strong-default-secret-key-for-dev-ONLY'
+    # In a real production scenario, you might want to exit or raise an error here
+    # to prevent running with an insecure default.
+    # raise ValueError("FLASK_SECRET_KEY environment variable is not set. It is required for production.")
+
+# Paths for vector store and notes directory
+VECTOR_STORE_PATH = os.getenv("VECTOR_STORE_PATH", "vectorstore_gemini")
+NOTES_PATH = os.getenv("NOTES_PATH", "notes")
+
+# LLM Model name
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-1.5-flash-latest")
+
 
 # Global variables to store the RAG chain
 rag_chain = None
 is_initialized = False
 
 def setup_api_key():
-    """Sets up the Google API key."""
-    if "GOOGLE_API_KEY" not in os.environ:
-        os.environ["GOOGLE_API_KEY"] = "AIzaSyAei-5qNYgFjniS97IX7Kfmn12ofjRgYBU"  # Replace with your actual key
+    """Sets up the Google API key from environment variables."""
+    google_api_key = os.getenv("GOOGLE_API_KEY")
+    if not google_api_key:
+        print("ERROR: GOOGLE_API_KEY environment variable not set. Chatbot initialization may fail.")
+        return False
+    os.environ["GOOGLE_API_KEY"] = google_api_key # Set it for langchain to pick up
     return True
 
-def create_or_load_vector_store():
-    """Creates or loads the vector store."""
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    
-    if os.path.exists(VECTOR_STORE_PATH):
-        return FAISS.load_local(VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
-    
-    loader = DirectoryLoader(NOTES_PATH, glob="**/*.txt")
-    docs = loader.load()
-    
-    if not docs:
-        dummy_doc = [Document(page_content="This is a placeholder. Add your own notes.")]
-        return FAISS.from_documents(dummy_doc, embeddings)
-    
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    split_docs = text_splitter.split_documents(docs)
-    vector_store = FAISS.from_documents(split_docs, embeddings)
-    vector_store.save_local(VECTOR_STORE_PATH)
-    return vector_store
-
-def create_rag_chain(vector_store):
-    """Creates the RAG chain using Google Gemini."""
-    llm = ChatGoogleGenerativeAI(model=LLM_MODEL, temperature=0.2, convert_system_message_to_human=True)
-    
-    prompt = ChatPromptTemplate.from_template("""
-Use the following context to answer the user's question as helpfully and accurately as possible.
-If the answer isn't directly in the context, feel free to suggest ideas or related insights.
-Format your response with proper line breaks and use markdown formatting where appropriate.
-Use bullet points or numbered lists when listing items.
-
-Context:
-{context}
-
-Question: {input}
-""")
-    
-    document_chain = create_stuff_documents_chain(llm, prompt)
-    retriever = vector_store.as_retriever()
-    retrieval_chain = create_retrieval_chain(retriever, document_chain)
-    return retrieval_chain
-
 def process_markdown(text):
-    """Convert markdown text to HTML."""
-    md = markdown.Markdown(extensions=['nl2br', 'tables', 'fenced_code'])
-    return md.convert(text)
+    """Converts markdown text to HTML."""
+    return markdown.markdown(text)
+
+def create_or_load_vector_store():
+    """Creates or loads the vector store from documents."""
+    global is_initialized
+
+    try:
+        # Check if vector store exists
+        if os.path.exists(VECTOR_STORE_PATH):
+            print(f"Loading vector store from {VECTOR_STORE_PATH}...")
+            embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+            vector_store = FAISS.load_local(VECTOR_STORE_PATH, embeddings, allow_dangerous_deserialization=True)
+            print("Vector store loaded.")
+            return vector_store
+        else:
+            print("Vector store not found. Creating a new one...")
+            if not os.path.exists(NOTES_PATH) or not os.listdir(NOTES_PATH):
+                print(f"No notes found in {NOTES_PATH}. Creating a dummy document.")
+                # Create a dummy document if no notes are found
+                # This ensures the vector store creation doesn't fail if 'notes' is empty
+                dummy_content = "This is a dummy document for chatbot initialization. Please add your actual knowledge base files to the 'notes' directory."
+                documents = [Document(page_content=dummy_content, metadata={"source": "dummy_document"})]
+            else:
+                print(f"Loading documents from {NOTES_PATH}...")
+                loader = DirectoryLoader(NOTES_PATH, glob="**/*.txt", show_progress=True)
+                documents = loader.load()
+                print(f"Loaded {len(documents)} documents.")
+
+            if not documents:
+                print("No documents loaded from notes directory. Cannot create vector store.")
+                return None
+
+            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+            texts = text_splitter.split_documents(documents)
+            print(f"Split into {len(texts)} chunks.")
+
+            embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+            vector_store = FAISS.from_documents(texts, embeddings)
+            vector_store.save_local(VECTOR_STORE_PATH)
+            print("Vector store created and saved.")
+            return vector_store
+    except Exception as e:
+        print(f"Error creating or loading vector store: {e}")
+        is_initialized = False
+        return None
 
 def initialize_chatbot():
-    """Initialize the chatbot components."""
+    """Initializes the RAG chatbot components."""
     global rag_chain, is_initialized
-    try:
-        setup_api_key()
-        vector_store = create_or_load_vector_store()
-        rag_chain = create_rag_chain(vector_store)
-        is_initialized = True
-        return True
-    except Exception as e:
-        print(f"Initialization error: {e}")
-        return False
+
+    if not setup_api_key():
+        is_initialized = False
+        return
+
+    vector_store = create_or_load_vector_store()
+    if vector_store is None:
+        is_initialized = False
+        return
+
+    llm = ChatGoogleGenerativeAI(model=LLM_MODEL, temperature=0.3)
+
+    prompt = ChatPromptTemplate.from_template("""
+    You are a helpful AI assistant. Answer the user's question based on the provided context.
+    If you cannot find the answer in the context, politely state that you don't have enough information.
+
+    Context:
+    {context}
+
+    Question: {input}
+    """)
+
+    document_chain = create_stuff_documents_chain(llm, prompt)
+    rag_chain = create_retrieval_chain(vector_store.as_retriever(), document_chain)
+    is_initialized = True
+    print("Chatbot initialized successfully!")
+
+# Initialize chatbot on startup
+# This will run once when the Flask app starts
+with app.app_context():
+    initialize_chatbot()
 
 @app.route('/')
 def index():
-    """Main chat page."""
-    if 'session_id' not in session:
-        session['session_id'] = str(uuid.uuid4())
+    """Renders the main chat interface."""
     return render_template('index.html')
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Handle chat messages."""
-    global rag_chain, is_initialized
-    
+    """Handles chat messages and returns responses from the RAG chain."""
     if not is_initialized:
-        if not initialize_chatbot():
-            return jsonify({'error': 'Failed to initialize chatbot. Please check your API key and notes directory.'}), 500
-    
+        return jsonify({'error': 'Chatbot is not initialized. Please check your API key and notes directory.'}), 500
+
     try:
         data = request.get_json()
         user_message = data.get('message', '').strip()
         show_sources = data.get('show_sources', False)
-        
+
         if not user_message:
             return jsonify({'error': 'Empty message'}), 400
-        
+
         # Get response from RAG chain
         response = rag_chain.invoke({"input": user_message})
-        
+
         # Process the response text to convert markdown to HTML
         processed_response = process_markdown(response["answer"])
-        
+
         result = {
             'response': processed_response
         }
-        
+
         # Only include sources if requested
         if show_sources:
             result['sources'] = [
@@ -133,9 +169,9 @@ def chat():
                 }
                 for doc in response.get("context", [])
             ]
-        
+
         return jsonify(result)
-        
+
     except Exception as e:
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
 
@@ -145,5 +181,4 @@ def status():
     return jsonify({'initialized': is_initialized})
 
 if __name__ == '__main__':
-    os.makedirs(NOTES_PATH, exist_ok=True)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True) # For local development, set debug=False for production testing
