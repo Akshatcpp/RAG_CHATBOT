@@ -3,8 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notes Chatbot</title>
+    <title>Gemini-inspired Notes Chatbot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --gemini-blue: #1a73e8;
+            --gemini-blue-light: #e8f0fe;
+            --gemini-gray-text: #3c4043;
+            --gemini-gray-light: #f1f3f4;
+            --gemini-gray-border: #dadce0;
+            --gemini-bg: #f8f9fa;
+            --gemini-white: #ffffff;
+            --gemini-shadow: rgba(0, 0, 0, 0.1);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,81 +24,97 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #883838;
+            font-family: 'Google Sans', 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--gemini-bg);
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
+            color: var(--gemini-gray-text);
         }
 
         .chat-container {
             width: 90%;
             max-width: 800px;
             height: 90vh;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            background: var(--gemini-white);
+            border-radius: 16px;
+            box-shadow: 0 4px 20px var(--gemini-shadow);
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
         .chat-header {
-            background: linear-gradient(135deg, #1e1e22 0%, #917b9f 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
+            background: var(--gemini-white);
+            color: var(--gemini-gray-text);
+            padding: 16px 24px;
+            text-align: left;
             position: relative;
+            border-bottom: 1px solid var(--gemini-gray-light);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .chat-header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            margin-bottom: 5px;
+            font-size: 22px;
+            font-weight: 500;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .chat-header h1 span {
+            font-size: 28px;
         }
 
         .chat-header p {
-            font-size: 14px;
-            opacity: 0.9;
+            font-size: 13px;
+            opacity: 0.8;
+            margin-top: 4px;
         }
 
         .settings-btn {
-            position: absolute;
-            right: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: rgba(255, 255, 255, 0.2);
+            background: none;
             border: none;
-            color: white;
+            color: var(--gemini-gray-text);
             width: 40px;
             height: 40px;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 18px;
+            font-size: 20px;
             transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
 
         .settings-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
+            background: var(--gemini-gray-light);
         }
 
         .chat-messages {
             flex: 1;
             padding: 20px;
             overflow-y: auto;
-            background: #fafafa;
+            background: var(--gemini-bg);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
         }
 
         .message {
-            margin-bottom: 20px;
             display: flex;
             align-items: flex-start;
             gap: 12px;
+            max-width: 100%;
         }
 
         .message.user {
-            flex-direction: row-reverse;
+            justify-content: flex-end;
         }
 
         .message-avatar {
@@ -98,42 +126,59 @@
             justify-content: center;
             font-size: 18px;
             flex-shrink: 0;
+            background-color: var(--gemini-blue-light);
+            color: var(--gemini-blue);
         }
 
         .message.user .message-avatar {
-            background: #667eea;
-            color: white;
+            background: var(--gemini-blue);
+            color: var(--gemini-white);
         }
 
         .message.bot .message-avatar {
-            background: #e0e0e0;
-            color: #666;
+            background: var(--gemini-gray-light);
+            color: var(--gemini-gray-text);
         }
 
         .message-content {
-            background: white;
             padding: 12px 16px;
             border-radius: 18px;
-            max-width: 70%;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            max-width: 75%;
             line-height: 1.5;
+            word-wrap: break-word;
+            background-color: var(--gemini-white);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--gemini-gray-light);
         }
 
         .message.user .message-content {
-            background: #667eea;
-            color: white;
+            background: var(--gemini-blue-light);
+            color: var(--gemini-blue);
+            border: 1px solid var(--gemini-blue-light);
+        }
+        
+        .message.bot .message-content {
+            background: var(--gemini-white);
+            color: var(--gemini-gray-text);
+        }
+
+        .message-content strong {
+            font-weight: 500;
         }
 
         .welcome-message {
             text-align: center;
-            color: #666;
+            color: var(--gemini-gray-text);
             padding: 40px 20px;
+            margin-top: auto; /* Push welcome message to center if content is short */
+            margin-bottom: auto;
         }
 
         .welcome-message h2 {
-            font-size: 24px;
+            font-size: 28px;
             margin-bottom: 15px;
-            color: #333;
+            color: var(--gemini-gray-text);
+            font-weight: 500;
         }
 
         .welcome-message p {
@@ -149,67 +194,74 @@
         }
 
         .chat-input-container {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #eee;
+            padding: 16px 20px;
+            background: var(--gemini-white);
+            border-top: 1px solid var(--gemini-gray-light);
         }
 
         .chat-input-wrapper {
             display: flex;
             gap: 12px;
             align-items: flex-end;
+            background-color: var(--gemini-gray-light);
+            border-radius: 25px;
+            padding: 8px 16px;
         }
 
         .input-group {
             flex: 1;
             position: relative;
+            display: flex;
+            align-items: center;
         }
 
         .chat-input {
             width: 100%;
-            padding: 12px 50px 12px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
+            padding: 8px 0; /* Adjusted padding */
+            border: none;
+            background: transparent;
             font-size: 16px;
             resize: none;
-            min-height: 50px;
+            min-height: 24px; /* Smaller min-height for single line */
             max-height: 120px;
             outline: none;
-            transition: border-color 0.3s;
-        }
-
-        .chat-input:focus {
-            border-color: #667eea;
+            line-height: 1.5;
+            color: var(--gemini-gray-text);
         }
 
         .tools-btn {
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
             background: none;
             border: none;
-            color: #666;
+            color: #757575;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 20px;
             padding: 5px;
+            margin-left: 8px;
+            transition: color 0.3s;
+        }
+
+        .tools-btn:hover {
+            color: var(--gemini-blue);
         }
 
         .send-btn {
-            background: #040817;
-            color: rgb(141, 125, 125);
+            background: var(--gemini-blue);
+            color: var(--gemini-white);
             border: none;
-            width: 50px;
-            height: 50px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             cursor: pointer;
             font-size: 18px;
             transition: background 0.3s;
             flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .send-btn:hover {
-            background: #5a6fd8;
+            background: #1565c0; /* Darker blue on hover */
         }
 
         .send-btn:disabled {
@@ -218,12 +270,16 @@
         }
 
         .typing-indicator {
-            display: none;
+            display: flex;
+            align-items: center;
             padding: 12px 16px;
-            background: white;
+            background: var(--gemini-white);
             border-radius: 18px;
             margin-bottom: 20px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            width: fit-content;
+            align-self: flex-start; /* Align with bot messages */
+            color: var(--gemini-gray-text);
         }
 
         .typing-dots {
@@ -250,19 +306,53 @@
         @keyframes typing {
             0%, 60%, 100% {
                 transform: translateY(0);
+                opacity: 0.6;
             }
             30% {
-                transform: translateY(-10px);
+                transform: translateY(-6px);
+                opacity: 1;
             }
         }
 
         .error-message {
-            background: #ffebee;
-            color: #c62828;
+            background: #fce8e6;
+            color: #c5221f;
             padding: 12px 16px;
             border-radius: 8px;
             margin-bottom: 20px;
-            border-left: 4px solid #c62828;
+            border-left: 4px solid #c5221f;
+        }
+
+        .sources-section {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--gemini-gray-border);
+            font-size: 13px;
+            color: #5f6368;
+        }
+
+        .sources-section strong {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .sources-section ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .sources-section li {
+            margin-bottom: 5px;
+            padding-left: 15px;
+            position: relative;
+        }
+
+        .sources-section li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--gemini-blue);
         }
 
         @media (max-width: 768px) {
@@ -270,14 +360,27 @@
                 width: 100%;
                 height: 100vh;
                 border-radius: 0;
+                box-shadow: none;
             }
 
             .message-content {
                 max-width: 85%;
             }
 
+            .chat-header {
+                padding: 12px 16px;
+            }
+
             .chat-header h1 {
                 font-size: 20px;
+            }
+
+            .chat-messages {
+                padding: 15px;
+            }
+
+            .chat-input-container {
+                padding: 12px 15px;
             }
         }
     </style>
@@ -285,8 +388,10 @@
 <body>
     <div class="chat-container">
         <div class="chat-header">
-            <h1>📚 Notes Chatbot</h1>
-            <p>Powered by NLP - Ask me anything about your notes!</p>
+            <div>
+                <h1><span>✨</span> Notes Chatbot</h1>
+                <p>Powered by NLP</p>
+            </div>
             <button class="settings-btn" onclick="toggleSources()" title="Toggle Sources">⚙️</button>
         </div>
 
@@ -295,7 +400,7 @@
                 <h2>How can I help you today?</h2>
                 <p>I can help you find information from your notes and answer questions about them. What would you like to know?</p>
                 <p class="tip">
-                    <strong></strong> Developed by Akshat at IIITA
+                    <strong>Developed by Akshat at IIITA</strong>
                 </p>
             </div>
             
@@ -320,7 +425,7 @@
                         onkeydown="handleKeyDown(event)"
                         oninput="autoResize(this)"
                     ></textarea>
-                    <button class="tools-btn" title="Tools">🔧</button>
+                    <button class="tools-btn" title="Attach files">📎</button>
                 </div>
                 <button class="send-btn" id="sendBtn" onclick="sendMessage()">
                     <span id="sendIcon">➤</span>
@@ -336,7 +441,8 @@
         function toggleSources() {
             showSources = !showSources;
             const btn = document.querySelector('.settings-btn');
-            btn.style.background = showSources ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)';
+            btn.style.background = showSources ? 'var(--gemini-gray-light)' : 'none'; // Reflect selected state
+            btn.style.color = showSources ? 'var(--gemini-blue)' : 'var(--gemini-gray-text)';
         }
 
         function hideWelcome() {
@@ -371,7 +477,7 @@
                 messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
                 
                 messageDiv.innerHTML = `
-                    <div class="message-avatar">${isUser ? '👤' : '🤖'}</div>
+                    <div class="message-avatar">${isUser ? '👤' : '✨'}</div>
                     <div class="message-content">${content}</div>
                 `;
                 
@@ -411,6 +517,8 @@
             showTyping();
             
             try {
+                // This part assumes you have a backend endpoint '/chat'
+                // For a true Gemini-like experience, you'd integrate with a powerful NLP model here.
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: {
@@ -430,19 +538,24 @@
                     addMessage(data.response, false);
                     
                     if (data.sources && showSources) {
-                        let sourcesHtml = '<div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;"><strong>Sources:</strong><ul>';
+                        let sourcesHtml = '<div class="sources-section"><strong>Sources:</strong><ul>';
                         data.sources.forEach(source => {
-                            sourcesHtml += `<li><em>${source.source}</em>: ${source.content}</li>`;
+                            // Ensure source.source and source.content exist and are strings
+                            const sourceName = typeof source.source === 'string' ? source.source : 'Unknown Source';
+                            const sourceContent = typeof source.content === 'string' ? source.content : 'No content available';
+                            sourcesHtml += `<li><em>${sourceName}</em>: ${sourceContent}</li>`;
                         });
                         sourcesHtml += '</ul></div>';
                         addMessage(sourcesHtml, false);
                     }
                 }
             } catch (error) {
-                addMessage('Sorry, there was an error processing your request. Please try again.', false, true);
+                console.error("Error sending message:", error);
+                addMessage('Sorry, I couldn't connect to the server. Please check your internet connection and try again.', false, true);
             } finally {
                 hideTyping();
                 sendBtn.disabled = false;
+                input.focus(); // Keep focus on input after sending
             }
         }
 
